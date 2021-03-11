@@ -1,5 +1,7 @@
 package com.drone.back.rabbitmq;
 
+import com.drone.back.models.message.BaseMessage;
+
 import org.springframework.amqp.core.AmqpTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,8 +19,7 @@ public class RabbitMQSender {
     @Value("${drone.rabbitmq.routingkey}")
     private String routingkey;
 
-    public void send(String msg) {
+    public void send(BaseMessage msg) {
         rabbit.convertAndSend(exchange, routingkey, msg);
-        System.out.println("Send msg = " + msg);
     }
 }
