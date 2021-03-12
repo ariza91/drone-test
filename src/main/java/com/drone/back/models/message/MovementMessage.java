@@ -1,13 +1,39 @@
 package com.drone.back.models.message;
 
-import org.apache.commons.lang3.tuple.Pair;
+import com.drone.back.models.Position;
 
-import lombok.Builder;
-import lombok.Getter;
-
-@Getter
-@Builder
 public class MovementMessage {
-    private Pair<Double, Double> position;
+
+    private Position position;
     private String datetime;
+
+    public MovementMessage() {
+    }
+
+    public MovementMessage(Position position, String datetime) {
+        this.position = position;
+        this.datetime = datetime;
+    }
+
+    public Position getPosition() {
+        return position;
+    }
+
+    public void setPosition(Position position) {
+        this.position = position;
+    }
+
+    public String getDatetime() {
+        return datetime;
+    }
+
+    public void setDatetime(String datetime) {
+        this.datetime = datetime;
+    }
+
+    @Override
+    public String toString() {
+        return "to position " + position + " at " + datetime;
+    }
+
 }

@@ -1,5 +1,5 @@
 package com.drone.back.constants;
 
 public enum Commands {
-    SHUTDOWN, MOVE, REPORT, ERROR
+    SHUTDOWN, MOVE, REPORT, ERROR, INFO
 }
