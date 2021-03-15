@@ -68,9 +68,6 @@ public class Drone implements IDrone {
         } else if (Commands.MOVE.equals(msg.getCommand())) {
             try {
                 messages.put(msg);
-                info.createInfo("New movement received " + msg.getMovement());
-                this.rabbitMQSender.send(info);
-
             } catch (InterruptedException e) {
                 BaseMessage menssage = new BaseMessage(Commands.ERROR, this.id);
                 menssage.createInfo(e.getMessage());
@@ -81,32 +78,38 @@ public class Drone implements IDrone {
 
     @Override
     public void run() {
+        try {
+            while (!shutdown.get()) {
+                BaseMessage msg = messages.poll();
 
-        while (!shutdown.get()) {
-            BaseMessage msg = messages.poll();
+                if (msg == null)
+                    continue;
 
-            if (msg == null)
-                continue;
+                // Move dron to position
+                this.position = msg.getMovement().getPosition();
 
-            // Move dron to position
-            this.position = msg.getMovement().getPosition();
+                BaseMessage info = new BaseMessage(Commands.INFO, this.id);
+                info.createInfo("Drone moving to " + this.position + " at " + msg.getMovement().getDatetime());
+                this.rabbitMQSender.send(info);
 
-            BaseMessage info = new BaseMessage(Commands.INFO, this.id);
-            info.createInfo("Drone moving to " + this.position);
-            this.rabbitMQSender.send(info);
+                // Find next closed tube
+                this.tubes.values().stream()
+                        .filter(tube -> Status.NONE.equals(tube.getStatus()) && this.tubeInRange(tube.getPosition()))
+                        .findFirst().ifPresent(tube -> {
 
-            // Find next closed tube
-            this.tubes.values().stream()
-                    .filter(tube -> Status.NONE.equals(tube.getStatus()) && this.tubeInRange(tube.getPosition()))
-                    .findFirst().ifPresent(tube -> {
+                            tube.setStatus(Status.values()[new Random().nextInt(3)]);
 
-                        tube.setStatus(Status.values()[new Random().nextInt(3)]);
+                            BaseMessage menssage = new BaseMessage(Commands.REPORT, this.id);
+                            menssage.createReport(tube.getLocation(), msg.getMovement().getDatetime(),
+                                    tube.getStatus());
 
-                        BaseMessage menssage = new BaseMessage(Commands.REPORT, this.id);
-                        menssage.createReport(tube.getLocation(), new Date().toString(), tube.getStatus());
-
-                        this.rabbitMQSender.send(menssage);
-                    });
+                            this.rabbitMQSender.send(menssage);
+                        });
+            }
+        } catch (Exception e) {
+            BaseMessage menssage = new BaseMessage(Commands.ERROR, this.id);
+            menssage.createInfo(e.getMessage());
+            this.rabbitMQSender.send(menssage);
         }
     }
 

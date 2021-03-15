@@ -16,21 +16,23 @@ import com.drone.back.rabbitmq.RabbitMQSender;
 public class DroneDispatcher implements Runnable {
 
     private RabbitMQSender rabbitMQSender;
-    private IDrone drone;
+    private String droneId;
 
-    public DroneDispatcher(IDrone d, RabbitMQSender rabbit) {
-        this.drone = d;
+    public DroneDispatcher(String droneId, RabbitMQSender rabbit) {
+        this.droneId = droneId;
         this.rabbitMQSender = rabbit;
     }
 
     @Override
     public void run() {
+
         try {
 
             AtomicBoolean shutdownSent = new AtomicBoolean(false);
+            AtomicBoolean finishDay = new AtomicBoolean(false);
 
             BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(ClassLoader.getSystemResourceAsStream(this.drone.getId() + ".csv")));
+                    new InputStreamReader(ClassLoader.getSystemResourceAsStream(this.droneId + ".csv")));
 
             reader.lines().forEach(position -> {
 
@@ -39,22 +41,23 @@ public class DroneDispatcher implements Runnable {
                 Position newPos = new Position(Double.parseDouble(info[1]), Double.parseDouble(info[2]));
                 String datetime = info[3];
                 TemporalAccessor currentTime = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").parse(datetime);
-                Boolean finishDay = currentTime.get(ChronoField.HOUR_OF_DAY) == 8
-                        && currentTime.get(ChronoField.MINUTE_OF_HOUR) > 11;
+                finishDay.set(currentTime.get(ChronoField.HOUR_OF_DAY) == 8
+                        && currentTime.get(ChronoField.MINUTE_OF_HOUR) >= 10);
 
-                if (finishDay && !shutdownSent.get()) {
+                if (finishDay.get() && !shutdownSent.get()) {
                     shutdownSent.set(true);
-                    this.rabbitMQSender.send(new BaseMessage(Commands.SHUTDOWN, this.drone.getId()));
+                    this.rabbitMQSender.send(new BaseMessage(Commands.SHUTDOWN, this.droneId));
                     return;
                 }
 
-                BaseMessage menssage = new BaseMessage(Commands.MOVE, this.drone.getId());
+                BaseMessage menssage = new BaseMessage(Commands.MOVE, this.droneId);
                 menssage.createMovement(newPos, datetime);
                 this.rabbitMQSender.send(menssage);
 
             });
+
         } catch (Exception e) {
-            BaseMessage menssage = new BaseMessage(Commands.ERROR, "DroneDispatcher-" + this.drone.getId());
+            BaseMessage menssage = new BaseMessage(Commands.ERROR, "DroneDispatcher-" + this.droneId);
             menssage.createInfo(e.getMessage());
             this.rabbitMQSender.send(menssage);
         }

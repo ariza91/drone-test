@@ -11,8 +11,9 @@ public class RabbitMQConsumer {
 
     @RabbitListener(queues = "${drone.rabbitmq.queue}")
     public void recievedMessage(BaseMessage msg) {
-        if (Commands.REPORT.equals(msg.getCommand()) || Commands.INFO.equals(msg.getCommand())
-                || Commands.SHUTDOWN.equals(msg.getCommand()) || Commands.ERROR.equals(msg.getCommand()))
-            System.out.println(msg.toString());
+        if (Commands.MOVE.equals(msg.getCommand()))
+            return;
+
+        System.out.println(msg.toString());
     }
 }

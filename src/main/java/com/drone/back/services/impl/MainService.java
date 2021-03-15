@@ -3,12 +3,14 @@ package com.drone.back.services.impl;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.AbstractMap;
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.drone.back.rabbitmq.RabbitMQSender;
 import com.drone.back.services.IMainService;
@@ -33,9 +35,8 @@ public class MainService implements IMainService {
     List<IDrone> drones;
 
     private AbstractMap<String, Tube> tubes = new ConcurrentHashMap<>();
-
+    private AtomicBoolean flying = new AtomicBoolean(false);
     private ExecutorService executor = Executors.newFixedThreadPool(4);
-    private List<Future> threads = new ArrayList<>();
 
     @Override
     public void start() {
@@ -52,12 +53,41 @@ public class MainService implements IMainService {
 
             drones.forEach(drone -> {
                 drone.setDroneConfiguration(tubes, rabbitMQSender);
-                threads.add(executor.submit(drone));
-                threads.add(executor.submit(new DroneDispatcher(drone, rabbitMQSender)));
+                executor.submit(drone);
+                executor.submit(new DroneDispatcher(drone.getId(), rabbitMQSender));
+                flying.set(true);
             });
 
         } catch (Exception e) {
-            BaseMessage menssage = new BaseMessage(Commands.ERROR, "MainService");
+            BaseMessage menssage = new BaseMessage(Commands.ERROR, "MainService-start");
+            menssage.createInfo(e.getMessage());
+            this.rabbitMQSender.send(menssage);
+        }
+    }
+
+    @Override
+    public void shutdown(BaseMessage msg) {
+        try {
+
+            if (!Commands.SHUTDOWN.equals(msg.getCommand()))
+                return;
+
+            if (executor.isTerminated() || executor.isShutdown())
+                return;
+
+            if (!flying.get())
+                return;
+
+            Thread.sleep(500);
+
+            executor.shutdown();
+
+            BaseMessage menssage = new BaseMessage(Commands.INFO, "MainService-shutdown");
+            menssage.createInfo("Executor shutting down");
+            this.rabbitMQSender.send(menssage);
+
+        } catch (Exception e) {
+            BaseMessage menssage = new BaseMessage(Commands.ERROR, "MainService-shutdown");
             menssage.createInfo(e.getMessage());
             this.rabbitMQSender.send(menssage);
         }
